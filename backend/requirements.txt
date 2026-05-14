@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+spacy
+transformers
+sentence-transformers
+chromadb
+pydantic
+pydantic-settings
+sqlalchemy
+psycopg2-binary
+requests
+python-multipart
+torch
+numpy
