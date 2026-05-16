@@ -19,11 +19,12 @@ class VerificationService:
         if not evidence:
             return {
                 "status": "Insufficient Evidence",
-                "risk_score": 0.5,
+                "risk_score": 0.0,
                 "confidence": 0.0
             }
             
-        logits = verifier_model.verify(claim, evidence)
+        # Standard NLI: (Premise, Hypothesis) -> (Evidence, Claim)
+        logits = verifier_model.verify(evidence, claim)
         probs = self._softmax(logits)
         
         # Find the index of the highest probability

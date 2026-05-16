@@ -1,6 +1,6 @@
 
 const ClaimCard = ({ data }) => {
-  const { claim, status, risk_score, evidence, source } = data;
+  const { claim, status, risk_score, evidence, source, explanation } = data;
 
   const getStatusColor = () => {
     switch (status) {
@@ -24,6 +24,13 @@ const ClaimCard = ({ data }) => {
         <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
           <div className="text-xs font-bold text-gray-500 uppercase mb-1">Evidence Source: {source}</div>
           <p className="text-sm text-gray-700 italic">"{evidence}"</p>
+        </div>
+      )}
+
+      {explanation && (
+        <div className="mt-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+          <div className="text-xs font-bold text-blue-500 uppercase mb-1">AI Reasoning</div>
+          <p className="text-sm text-slate-700 leading-snug">{explanation}</p>
         </div>
       )}
       

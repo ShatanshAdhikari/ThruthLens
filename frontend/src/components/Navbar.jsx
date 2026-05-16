@@ -11,23 +11,18 @@ const Navbar = ({ onNavigate }) => {
           <span>TruthLens</span>
         </div>
         <div className="hidden md:flex space-x-8">
-          <button 
-            onClick={() => onNavigate('landing')} 
+          <a 
+            href="#features" 
             className="text-sm font-medium hover:text-blue-400 transition"
           >
             Product
-          </button>
-          <button 
-            onClick={() => onNavigate('verify')} 
-            className="text-sm font-medium hover:text-blue-400 transition"
-          >
-            Verify
-          </button>
-          <button 
+          </a>
+          <a 
+            href="#resources"
             className="text-sm font-medium hover:text-blue-400 transition"
           >
             Resources
-          </button>
+          </a>
         </div>
         <div>
           <button 

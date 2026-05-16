@@ -3,6 +3,8 @@ import axios from 'axios';
 import ClaimCard from '../components/ClaimCard';
 import Loader from '../components/Loader';
 import DashboardChart from '../components/DashboardChart';
+import Heatmap from '../components/Heatmap';
+import ConfidenceMeter from '../components/ConfidenceMeter';
 
 const VerificationWorkspace = () => {
   const [text, setText] = useState('');
@@ -69,19 +71,50 @@ const VerificationWorkspace = () => {
             <>
               <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                 <h2 className="text-xl font-bold mb-4">Verification Summary</h2>
-                <div className="flex items-center space-x-6 mb-6">
-                  <div className="text-4xl font-bold text-blue-600">
-                    {(results.overall_risk * 100).toFixed(0)}%
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 uppercase">Overall Risk Score</div>
-                    <div className="text-lg font-semibold">
-                      {results.overall_risk > 0.7 ? 'High Risk' : results.overall_risk > 0.3 ? 'Moderate Risk' : 'Low Risk'}
+                {results.metadata && (
+                  <div className="flex flex-wrap gap-4 mb-6">
+                    <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs">
+                      <span className="text-gray-500 font-medium uppercase">Total Time:</span>
+                      <span className="ml-2 font-bold text-blue-600">{results.metadata.total_time_ms}ms</span>
                     </div>
+                    <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs">
+                      <span className="text-gray-500 font-medium uppercase">Extraction:</span>
+                      <span className="ml-2 font-bold text-slate-700">{results.metadata.extraction_time_ms}ms</span>
+                    </div>
+                    <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs">
+                      <span className="text-gray-500 font-medium uppercase">Retrieval:</span>
+                      <span className="ml-2 font-bold text-slate-700">{results.metadata.retrieval_time_ms}ms</span>
+                    </div>
+                    <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs">
+                      <span className="text-gray-500 font-medium uppercase">Verification:</span>
+                      <span className="ml-2 font-bold text-slate-700">{results.metadata.verification_time_ms}ms</span>
+                    </div>
+                    <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-xs">
+                      <span className="text-gray-500 font-medium uppercase">Explainability:</span>
+                      <span className="ml-2 font-bold text-slate-700">{results.metadata.explanation_time_ms}ms</span>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <ConfidenceMeter score={results.overall_risk} />
+                  <div className="flex flex-col justify-center">
+                    <div className="text-sm font-medium text-gray-500 uppercase">Analysis Results</div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      {results.claims.length} Factual Claims
+                    </div>
+                    <p className="text-gray-500 text-sm mt-2">
+                      {results.overall_risk < 0.3 
+                        ? 'The content appears to be highly reliable based on available evidence.' 
+                        : results.overall_risk < 0.7 
+                        ? 'Some claims may be inaccurate or lack sufficient evidence.' 
+                        : 'High probability of hallucinations detected in this response.'}
+                    </p>
                   </div>
                 </div>
                 <DashboardChart claims={results.claims} />
               </div>
+
+              <Heatmap text={results.text} claims={results.claims} />
 
               <div className="space-y-4">
                 <h2 className="text-xl font-bold">Extracted Claims ({results.claims.length})</h2>
