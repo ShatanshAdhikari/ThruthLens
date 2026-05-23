@@ -2,42 +2,68 @@
 const Heatmap = ({ text, claims }) => {
   if (!text || !claims) return null;
 
-  // Sort claims by start position
-  const sortedClaims = [...claims].sort((a, b) => a.start - b.start);
+  // 1. Group claims by their text range (start/end)
+  const rangeMap = {};
+  claims.forEach(c => {
+    const key = `${c.start}-${c.end}`;
+    if (!rangeMap[key]) {
+      rangeMap[key] = { ...c, count: 1 };
+    } else {
+      // Keep the most severe risk/status
+      if (c.risk_score > rangeMap[key].risk_score) {
+        rangeMap[key].risk_score = c.risk_score;
+        rangeMap[key].status = c.status;
+      }
+      rangeMap[key].count += 1;
+    }
+  });
+
+  // 2. Convert back to array and sort
+  const uniqueRanges = Object.values(rangeMap).sort((a, b) => a.start - b.start);
 
   const renderHighlightedText = () => {
     const elements = [];
     let lastIndex = 0;
 
-    sortedClaims.forEach((claim, index) => {
-      // Add text before the claim
-      if (claim.start > lastIndex) {
+    uniqueRanges.forEach((range, index) => {
+      // Add text before the range
+      if (range.start > lastIndex) {
         elements.push(
           <span key={`text-${lastIndex}`}>
-            {text.substring(lastIndex, claim.start)}
+            {text.substring(lastIndex, range.start)}
           </span>
         );
       }
 
       // Determine color based on risk score
       const getColorClass = (score) => {
-        if (score > 0.7) return 'bg-red-200 text-red-900 border-b-2 border-red-500';
-        if (score > 0.3) return 'bg-yellow-200 text-yellow-900 border-b-2 border-yellow-500';
-        return 'bg-green-200 text-green-900 border-b-2 border-green-500';
+        if (score > 0.7) return 'bg-red-200 text-red-900 border-b-2 border-red-400';
+        if (score > 0.3) return 'bg-yellow-200 text-yellow-900 border-b-2 border-yellow-400';
+        return 'bg-green-200 text-green-900 border-b-2 border-green-400';
       };
 
-      // Add the highlighted claim
+      // Add the highlighted range
       elements.push(
         <mark
-          key={`claim-${index}`}
-          className={`px-1 rounded-sm cursor-help transition-all hover:brightness-95 ${getColorClass(claim.risk_score)}`}
-          title={`${claim.status} (Risk: ${(claim.risk_score * 100).toFixed(0)}%)`}
+          key={`range-${index}`}
+          className={`px-1 rounded-sm cursor-help transition-all hover:brightness-95 relative group ${getColorClass(range.risk_score)}`}
         >
-          {text.substring(claim.start, claim.end)}
+          {text.substring(range.start, range.end)}
+          
+          {/* Custom Tooltip */}
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-48 bg-slate-800 text-white text-[10px] p-2 rounded shadow-xl pointer-events-none">
+            <div className="font-bold border-b border-slate-600 pb-1 mb-1 uppercase tracking-tighter">
+              {range.count > 1 ? `${range.count} Claims Found` : 'Clinical Status'}
+            </div>
+            <div className="flex justify-between items-center">
+              <span>{range.status}</span>
+              <span className="font-mono">{(range.risk_score * 100).toFixed(0)}% Risk</span>
+            </div>
+          </span>
         </mark>
       );
 
-      lastIndex = claim.end;
+      lastIndex = range.end;
     });
 
     // Add remaining text

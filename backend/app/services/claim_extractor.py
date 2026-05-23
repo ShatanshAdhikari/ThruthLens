@@ -1,72 +1,64 @@
-import spacy
+from app.services.ollama_service import ollama_service
 from typing import List
 
 class ClaimExtractor:
     def __init__(self):
+        # We still keep spaCy for character offset mapping if needed, 
+        # but the primary deconstruction is now LLM-based.
         try:
+            import spacy
             self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            # Fallback if model not found (though we just installed it)
-            self.nlp = spacy.blank("en")
-            self.nlp.add_pipe("sentencizer")
+        except:
+            self.nlp = None
 
     def extract_claims(self, text: str) -> List[dict]:
         """
-        Extract factual claims with their character offsets.
-        Improved version that splits complex sentences into atomic claims.
+        Extract factual claims using deep LLM deconstruction.
+        Resolves coreferences and maps claims back to original text offsets.
         """
         if not text:
             return []
             
-        doc = self.nlp(text)
-        claims = []
+        # 1. Split original text into sentences for offset mapping
+        sentences = []
+        if self.nlp:
+            doc = self.nlp(text)
+            sentences = [{"text": s.text, "start": s.start_char, "end": s.end_char} for s in doc.sents]
+        else:
+            # Fallback split
+            sentences = [{"text": s.strip(), "start": 0, "end": len(text)} for s in text.split('.') if s.strip()]
+
+        # 2. LLM-based Deconstruction
+        llm_claims = ollama_service.extract_atomic_claims(text)
         
-        for sent in doc.sents:
-            # We look for coordinating conjunctions (CCONJ) that connect two independent clauses (ROOTs)
-            # For simplicity, we split sentences longer than 15 words if they contain 'and' or 'but'
-            clean_text = sent.text.strip()
-            if len(clean_text) <= 5:
+        # 3. Map back to original text offsets
+        processed_claims = []
+        for item in llm_claims:
+            claim_text = item.get("claim", "")
+            if not claim_text:
                 continue
-
-            # Check if sentence is complex and needs splitting
-            split_points = []
-            if len(sent) > 15:
-                for token in sent:
-                    if token.pos_ == "CCONJ" and token.text.lower() in ["and", "but"]:
-                        # Heuristic: split if the conjunction is not at the start/end
-                        if 0 < token.i - sent.start < len(sent) - 1:
-                            split_points.append(token)
-
-            if not split_points:
-                claims.append({
-                    "text": clean_text,
-                    "start": sent.start_char,
-                    "end": sent.end_char
-                })
-            else:
-                # Split at the first split point for now
-                sp = split_points[0]
                 
-                # First part
-                part1_text = text[sent.start_char : sp.idx].strip()
-                if len(part1_text) > 5:
-                    claims.append({
-                        "text": part1_text,
-                        "start": sent.start_char,
-                        "end": sp.idx
-                    })
-                
-                # Second part (skipping the conjunction itself)
-                next_token_idx = sp.idx + len(sp.text) + 1
-                part2_text = text[next_token_idx : sent.end_char].strip()
-                if len(part2_text) > 5:
-                    claims.append({
-                        "text": part2_text,
-                        "start": next_token_idx,
-                        "end": sent.end_char
-                    })
-        
-        return claims
+            # Find the sentence with the highest overlap or similarity
+            # Simple heuristic: find the sentence that contains the most keywords from the claim
+            best_sent = sentences[0] if sentences else {"start": 0, "end": len(text)}
+            max_overlap = -1
+            
+            claim_words = set(claim_text.lower().split())
+            for sent in sentences:
+                sent_words = set(sent["text"].lower().split())
+                overlap = len(claim_words.intersection(sent_words))
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    best_sent = sent
+            
+            processed_claims.append({
+                "text": claim_text,
+                "reasoning": item.get("reasoning", ""),
+                "start": best_sent["start"],
+                "end": best_sent["end"]
+            })
+            
+        return processed_claims
 
 # Singleton instance
 claim_extractor = ClaimExtractor()

@@ -5,6 +5,7 @@ import Loader from '../components/Loader';
 import DashboardChart from '../components/DashboardChart';
 import Heatmap from '../components/Heatmap';
 import ConfidenceMeter from '../components/ConfidenceMeter';
+import EvidencePanel from '../components/EvidencePanel';
 
 const VerificationWorkspace = () => {
   const [text, setText] = useState('');
@@ -27,6 +28,11 @@ const VerificationWorkspace = () => {
       setLoading(false);
     }
   };
+
+  // Helper to collect all evidence from all claims
+  const allEvidence = (results?.claims || []).reduce((acc, claim) => {
+    return [...acc, ...(claim.evidence_details || [])];
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -117,11 +123,13 @@ const VerificationWorkspace = () => {
               <Heatmap text={results.text} claims={results.claims} />
 
               <div className="space-y-4">
-                <h2 className="text-xl font-bold">Extracted Claims ({results.claims.length})</h2>
+                <h2 className="text-xl font-bold">Consensus Analysis ({results.claims.length})</h2>
                 {results.claims.map((claim, index) => (
                   <ClaimCard key={index} data={claim} />
                 ))}
               </div>
+
+              <EvidencePanel evidence={allEvidence} />
             </>
           )}
 

@@ -1,10 +1,12 @@
 import chromadb
 from chromadb.utils import embedding_functions
 from app.models.embedding_model import embedding_model
+from app.services.search_service import search_service
+from app.config import settings
 import os
 
 class RetrievalService:
-    def __init__(self, persist_directory: str = "db/chroma"):
+    def __init__(self, persist_directory: str = settings.CHROMA_PERSIST_DIR):
         self.client = chromadb.PersistentClient(path=persist_directory)
         
         # Use a custom embedding function that uses our EmbeddingModel
@@ -43,33 +45,69 @@ class RetrievalService:
             ids=[item["id"] for item in evidence_items]
         )
 
-    def retrieve_evidence(self, query: str, n_results: int = 3, threshold: float = 1.0):
+    def retrieve_evidence(self, query: str, n_results: int = 5, threshold: float = 1.5):
         """
         Retrieve evidence with a similarity threshold.
-        Distance scores usually range from 0 to 2 (0 is perfect match).
+        Distance scores: 0 (identical) to 2 (completely different).
+        A threshold of 1.5 is fairly inclusive for vector search.
         """
+        # Targeted query optimization: clean and truncate if too long
+        query = query.strip()[:500] 
+        
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results
         )
         
-        # Filter results by threshold
-        filtered_results = {
-            "ids": [[]],
-            "documents": [[]],
-            "metadatas": [[]],
-            "distances": [[]]
-        }
+        formatted_results = []
         
         if results["distances"] and results["distances"][0]:
             for i, distance in enumerate(results["distances"][0]):
                 if distance <= threshold:
-                    filtered_results["ids"][0].append(results["ids"][0][i])
-                    filtered_results["documents"][0].append(results["documents"][0][i])
-                    filtered_results["metadatas"][0].append(results["metadatas"][0][i])
-                    filtered_results["distances"][0].append(distance)
+                    formatted_results.append({
+                        "id": results["ids"][0][i],
+                        "text": results["documents"][0][i],
+                        "metadata": results["metadatas"][0][i],
+                        "distance": float(distance),
+                        "score": 1.0 - (distance / 2.0)  # Normalize to 0-1 similarity score
+                    })
                     
-        return filtered_results
+        # Sort by distance (ascending)
+        formatted_results.sort(key=lambda x: x["distance"])
+        return formatted_results
+
+    def retrieve_hybrid(self, query: str, context: Optional[str] = None, n_results: int = 3, threshold: float = 1.2):
+        """
+        Focus on real-time web search for clinical consensus, bypassing local DB
+        as the primary source of truth.
+        """
+        # 1. Web Search (Primary source now)
+        web_results = []
+        if settings.USE_WEB_SEARCH:
+            web_results = search_service.search_all(query, context=context, max_results=settings.MAX_SEARCH_RESULTS_PER_SOURCE)
+            
+        # Format web results
+        formatted_web = []
+        for i, res in enumerate(web_results):
+            formatted_web.append({
+                "id": f"web_{i}",
+                "text": res["text"],
+                "metadata": {
+                    "source": res["source"],
+                    "url": res.get("url", ""),
+                    "type": res.get("type", "web_search")
+                },
+                "distance": 0.5,
+                "score": 0.75
+            })
+            
+        # 2. Local Search (Optional/Fallback/Supplementary)
+        # We can still check local DB for previously verified facts or context
+        local_results = self.retrieve_evidence(query, n_results=2, threshold=threshold)
+        
+        # Combine
+        combined = formatted_web + local_results
+        return combined[:n_results + 2]
 
 # Singleton instance
 retrieval_service = RetrievalService()
