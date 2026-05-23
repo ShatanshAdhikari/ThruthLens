@@ -1,18 +1,37 @@
 from typing import List, Dict, Any
+import numpy as np
 
 class ScoringService:
     def calculate_final_score(self, verification_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Aggregate scores from multiple evidence sources or claims.
+        Aggregate scores with weighted adjustments based on consensus and confidence.
         """
         if not verification_results:
             return {"overall_risk": 0.0, "status": "No data"}
             
-        total_risk = sum(res["risk_score"] for res in verification_results)
-        avg_risk = total_risk / len(verification_results)
+        weighted_risks = []
+        for res in verification_results:
+            confidence = res.get("confidence", 0.5)
+            
+            if res["status"] == "Contradicted":
+                # High risk: at least 0.7, scaled by confidence
+                base_risk = 0.7
+                adjusted_risk = base_risk + (0.3 * confidence)
+            elif res["status"] == "Supported":
+                # Low risk: at most 0.3, inverted by confidence
+                base_risk = 0.3
+                adjusted_risk = base_risk * (1.0 - confidence)
+            else:
+                # Inconclusive/Insufficient Evidence
+                # Moderate risk with uncertainty
+                adjusted_risk = 0.5 + (0.2 * (1.0 - confidence))
+                
+            weighted_risks.append(np.clip(adjusted_risk, 0, 1))
+            
+        avg_risk = sum(weighted_risks) / len(weighted_risks)
         
         return {
-            "overall_risk": avg_risk,
+            "overall_risk": float(avg_risk),
             "claim_count": len(verification_results),
             "status": "Verified"
         }

@@ -6,12 +6,11 @@ class VerifierModel:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = CrossEncoder(model_name, device=self.device)
 
-    def verify(self, claim: str, evidence: str):
+    def verify(self, premise: str, hypothesis: str):
         """
-        Verify the claim against the evidence.
-        Returns probabilities for [entailment, neutral, contradiction].
+        Verify the hypothesis against the premise.
         """
-        scores = self.model.predict([(claim, evidence)])
+        scores = self.model.predict([(premise, hypothesis)])
         return scores[0]
 
 # Singleton instance

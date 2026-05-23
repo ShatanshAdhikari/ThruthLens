@@ -27,22 +27,18 @@ TruthLens
 
 ## Project Type
 
-AI Hallucination Detection & Verification System
+Clinically Rigorous AI Hallucination Detection & Verification System
 
 ## Goal
 
-TruthLens is an intelligent verification layer for Large Language Models (LLMs).
+TruthLens is a high-integrity verification layer for Large Language Models (LLMs). It moves beyond simple keyword matching to perform deep semantic reasoning and multi-source consensus analysis.
 
-The system detects whether AI-generated content contains hallucinated, fabricated, misleading, or unsupported factual claims.
-
-The platform should:
-
-* analyze AI responses,
-* extract factual claims,
-* retrieve supporting evidence,
-* perform semantic verification,
-* estimate hallucination probability,
-* and visualize trust/risk scores.
+The system:
+* deconstructs content into context-aware factual claims,
+* resolves coreferences (e.g., mapping "it" to the correct subject),
+* harvests evidence from multiple authoritative web sources (News, Fact-Checkers, Official reports),
+* performs clinical audit reasoning via a "Judge Agent",
+* and maintains a complete relational audit trail of the verification chain.
 
 ---
 
@@ -51,87 +47,37 @@ The platform should:
 ## INPUT
 
 User provides:
-
 * AI-generated response
-* prompt text
-* article
-* paragraph
-* or chatbot output
+* Prompt text
+* Article
+* or Chatbot output
 
 ---
 
-## PROCESSING PIPELINE
+## PROCESSING PIPELINE (CAR ARCHITECTURE)
 
-### 1. Claim Extraction
-
-Break text into atomic factual claims.
+### 1. Deep Claim Deconstruction (Meaning & Vision)
+Uses an LLM (Llama3) to break text into atomic factual claims while resolving pronouns and maintaining context. 
 
 Example:
-Input:
-
-```text
-Paris is the capital of France and the Eiffel Tower was built in 1920.
-```
-
+Input: *"The Moon is round. It is Earth's satellite."*
 Output:
+*   Claim 1: *"The Moon is round"*
+*   Claim 2: *"**The Moon** is Earth's satellite"* (Resolved "It" to "The Moon")
 
-```text
-Claim 1:
-Paris is the capital of France
+### 2. Intelligent Research Orchestrator
+Generates multi-perspective search queries for every claim:
+*   **Direct Verification:** "Is [claim] true?"
+*   **Contradiction Search:** "[claim] debunked" or "Conflicting reports on [claim]"
+*   **Contextual Search:** Subject-attribute relationship queries.
 
-Claim 2:
-Eiffel Tower was built in 1920
-```
+### 3. Consensus-Audit-Reasoning (CAR) Engine
+*   **Multi-Source Harvesting:** Retrieves 5-10 independent sources per claim (Tavily, Google Fact Check).
+*   **Individual NLI:** Performs cross-encoder entailment checks against every source.
+*   **The "Judge" Agent:** An LLM auditor that weighs source reliability, resolves nuances, and provides a final **Supported**, **Contradicted**, or **Inconclusive** verdict with a detailed chain of thought.
 
----
-
-### 2. Evidence Retrieval
-
-Retrieve trusted evidence using:
-
-* semantic search,
-* vector similarity,
-* retrieval pipelines.
-
-Sources may include:
-
-* Wikipedia,
-* curated datasets,
-* verified corpora.
-
----
-
-### 3. Semantic Verification
-
-Compare claim vs evidence.
-
-Possible labels:
-
-* Supported
-* Contradicted
-* Insufficient Evidence
-
----
-
-### 4. Hallucination Scoring
-
-Generate:
-
-* risk score,
-* confidence score,
-* reliability estimate.
-
----
-
-### 5. Explainability
-
-System must explain WHY a claim was flagged.
-
-Example:
-
-```text
-Evidence contradicts the provided date.
-```
+### 4. Relational Audit Trail
+Logs every step (Original text, claims, queries, snippets, verdicts, and reasoning) in a relational database for complete transparency.
 
 ---
 
@@ -141,11 +87,16 @@ Example:
 
 ```json
 {
-  "claim": "Eiffel Tower was built in 1920",
-  "status": "Contradicted",
-  "hallucination_risk": 0.92,
-  "confidence": "High",
-  "evidence": "The Eiffel Tower was completed in 1889"
+  "claim": "The Moon is about one-quarter of Earth's diameter",
+  "status": "Supported",
+  "hallucination_risk": 0.05,
+  "confidence": 0.98,
+  "reasoning": "Official NASA records and multiple scientific journals confirm the Moon's diameter is roughly 3,474 km, which is approximately 27% (one-quarter) of Earth's diameter.",
+  "consensus_stats": {"Supported": 5, "Contradicted": 0, "Insufficient Evidence": 0},
+  "evidence_details": [
+    { "source": "NASA", "verdict": "Supported", "url": "https://..." },
+    { "source": "Britannica", "verdict": "Supported", "url": "https://..." }
+  ]
 }
 ```
 
@@ -156,253 +107,71 @@ Example:
 # FRONTEND REQUIREMENTS
 
 ## Framework
-
 React + Vite
 
-## Styling
-
-Tailwind CSS
-
 ## State Management
-
 React hooks
 
 ## API Communication
-
 Axios
 
-## Charts
-
-Recharts
-
-## Frontend Goals
-
-Frontend must look modern and production-ready.
-
-The UI should resemble:
-
-* AI SaaS platforms,
-* modern dashboards,
-* verification systems,
-* analytics platforms.
-
----
-
-# REQUIRED FRONTEND FEATURES
-
-## 1. Landing Page
-
-Contains:
-
-* project branding,
-* explanation,
-* input area,
-* CTA buttons.
-
----
-
-## 2. Verification Workspace
-
-Contains:
-
-* prompt input box,
-* AI response input,
-* verification button,
-* processing indicators.
-
----
-
-## 3. Claim Analysis Panel
-
-Display:
-
-* extracted claims,
-* verification status,
-* confidence scores.
-
-Claims should use:
-
-* green = supported,
-* red = contradicted,
-* yellow = uncertain.
-
----
-
-## 4. Evidence Viewer
-
-Display:
-
-* retrieved evidence,
-* evidence source,
-* semantic similarity score.
-
----
-
-## 5. Heatmap Visualization
-
-Show hallucination risk visually.
-
----
-
-## 6. Analytics Dashboard
-
-Display:
-
-* verification statistics,
-* risk trends,
-* claim distributions,
-* model performance.
-
----
-
-# FRONTEND FOLDER STRUCTURE
-
-```text
-frontend/
-│
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── services/
-│   ├── hooks/
-│   ├── layouts/
-│   ├── assets/
-│   ├── styles/
-│   ├── App.jsx
-│   └── main.jsx
-```
-
----
-
-# RECOMMENDED FRONTEND COMPONENTS
-
-```text
-components/
-│
-├── Navbar.jsx
-├── HeroSection.jsx
-├── ClaimCard.jsx
-├── VerificationCard.jsx
-├── EvidencePanel.jsx
-├── ConfidenceMeter.jsx
-├── Heatmap.jsx
-├── DashboardChart.jsx
-├── Loader.jsx
-└── Footer.jsx
-```
+## Charts & Maps
+*   **Recharts:** Bar charts for risk distribution.
+*   **Semantic Heatmap:** Text-level risk visualization with context-aware highlighting.
 
 ---
 
 # BACKEND REQUIREMENTS
 
 ## Framework
-
 FastAPI
 
-## Backend Goals
+## Database (Audit & Logs)
+SQLAlchemy + SQLite (PostgreSQL ready)
 
-Backend must:
-
-* expose REST APIs,
-* orchestrate AI pipeline,
-* manage retrieval,
-* process verification,
-* and return structured results.
+## Search Orchestration
+Tavily (RAG-optimized), Google Fact Check Tools API, DuckDuckGo.
 
 ---
 
 # BACKEND MODULES
 
-## 1. API Layer
+## 1. CAR API Layer
+Handles multi-stage orchestration and async result streaming.
 
-Handles:
-
-* request routing,
-* response handling,
-* validation.
-
----
-
-## 2. Claim Extraction Service
-
-Uses:
-
-* spaCy,
-* NLP parsing,
-* sentence segmentation.
-
----
+## 2. LLM Services (Ollama/Llama3)
+*   Deconstruction Agent
+*   Search Query Generator
+*   Clinical Judge Agent
 
 ## 3. Retrieval Service
-
-Uses:
-
-* embeddings,
-* vector search,
-* semantic retrieval.
-
----
+Manages hybrid retrieval (Real-time web + Optional local cache).
 
 ## 4. Verification Service
-
-Uses:
-
-* transformer NLI models,
-* semantic similarity.
-
----
-
-## 5. Hallucination Scoring Engine
-
-Combines:
-
-* contradiction confidence,
-* retrieval confidence,
-* semantic consistency.
-
----
-
-# BACKEND FOLDER STRUCTURE
-
-```text
-backend/
-│
-├── app/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   ├── services/
-│   ├── utils/
-│   ├── main.py
-│   └── config.py
-```
+Combines Transformer NLI (DeBERTa) with LLM Consensus reasoning.
 
 ---
 
 # REQUIRED BACKEND FILES
 
 ## API
-
 * verify_routes.py
 * health_routes.py
 
-## Services
-
-* claim_extractor.py
-* retrieval_service.py
-* verification_service.py
-* scoring_service.py
+## Core
+* database.py (SQLAlchemy config)
 
 ## Models
-
+* database.py (Audit schemas)
 * embedding_model.py
 * verifier_model.py
 
-## Utils
-
-* preprocessing.py
-* similarity.py
-* logger.py
+## Services
+* claim_extractor.py (LLM Deconstruction)
+* retrieval_service.py (Web Orchestrator)
+* search_service.py (Multi-Source harvester)
+* verification_service.py (Judge Agent logic)
+* scoring_service.py (Consensus weighting)
 
 ---
 
