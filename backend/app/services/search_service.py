@@ -1,9 +1,19 @@
 import requests
 from typing import List, Dict, Any, Optional
-from duckduckgo_search import DDGS
+from urllib.parse import urlparse
+from ddgs import DDGS
 from tavily import TavilyClient
 from app.config import settings
 from abc import ABC, abstractmethod
+
+
+def _domain_from_url(url: str) -> str:
+    """Return a human-readable domain name from a URL, e.g. 'en.wikipedia.org'."""
+    try:
+        netloc = urlparse(url).netloc
+        return netloc.replace("www.", "") if netloc else url
+    except Exception:
+        return url
 
 class BaseSearchSource(ABC):
     @abstractmethod
@@ -17,11 +27,12 @@ class DuckDuckGoSearchSource(BaseSearchSource):
             with DDGS() as ddgs:
                 ddg_results = list(ddgs.text(query, max_results=max_results))
                 for r in ddg_results:
+                    url = r.get("href", "")
                     results.append({
                         "text": r.get("body", ""),
                         "title": r.get("title", ""),
-                        "source": "DuckDuckGo",
-                        "url": r.get("href", ""),
+                        "source": _domain_from_url(url) if url else "DuckDuckGo",
+                        "url": url,
                         "type": "web_search"
                     })
         except Exception as e:
@@ -38,14 +49,14 @@ class TavilySearchSource(BaseSearchSource):
             
         results = []
         try:
-            # Using Tavily's search context for better RAG snippets
             response = self.client.search(query, search_depth="advanced", max_results=max_results)
             for r in response.get("results", []):
+                url = r.get("url", "")
                 results.append({
                     "text": r.get("content", ""),
                     "title": r.get("title", ""),
-                    "source": r.get("url", "Tavily"),
-                    "url": r.get("url", ""),
+                    "source": _domain_from_url(url) if url else "Tavily",
+                    "url": url,
                     "type": "web_search"
                 })
         except Exception as e:
@@ -119,9 +130,11 @@ class SearchService:
             for source in self.sources:
                 source_results = source.search(query, max_results=2) # 2 per query/source
                 for res in source_results:
-                    url = res.get("url")
-                    if url not in seen_urls:
-                        all_results.append(res)
+                    url = res.get("url") or ""
+                    if url and url in seen_urls:
+                        continue
+                    all_results.append(res)
+                    if url:
                         seen_urls.add(url)
                 
                 if len(all_results) >= max_results * 2:

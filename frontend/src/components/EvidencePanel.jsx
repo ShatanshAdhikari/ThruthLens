@@ -15,17 +15,25 @@ const EvidencePanel = ({ evidence }) => {
         {evidence.map((ev, idx) => (
           <div key={idx} className="border-b border-slate-50 last:border-0 pb-4 last:pb-0">
             <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase mr-2 ${
-                  ev.verdict === 'Supported' ? 'bg-green-100 text-green-700' : 
+              <div className="flex items-center flex-wrap gap-1">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase mr-1 ${
+                  ev.verdict === 'Supported' ? 'bg-green-100 text-green-700' :
                   ev.verdict === 'Contradicted' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                 }`}>
                   {ev.verdict}
                 </span>
                 <span className="text-sm font-bold text-slate-800">{ev.source}</span>
+                {ev.relevance_score != null && (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ml-1 ${
+                    ev.relevance_score >= 0.5 ? 'bg-blue-50 text-blue-600' :
+                    ev.relevance_score >= 0.3 ? 'bg-slate-100 text-slate-500' : 'bg-orange-50 text-orange-500'
+                  }`}>
+                    {(ev.relevance_score * 100).toFixed(0)}% relevant
+                  </span>
+                )}
               </div>
               {ev.url && (
-                <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">
+                <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs flex-shrink-0">
                   View Source
                 </a>
               )}

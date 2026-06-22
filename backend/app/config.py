@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     GOOGLE_FACT_CHECK_API_KEY: Optional[str] = None
     
     # Model Settings
+    OLLAMA_MODEL: str = "llama3"
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     VERIFIER_MODEL: str = "cross-encoder/nli-deberta-v3-small"
     

@@ -1,9 +1,19 @@
+const Navbar = ({ onNavigate, currentPage }) => {
+  const handleSectionLink = (hash) => {
+    if (currentPage !== 'landing') {
+      onNavigate('landing');
+      setTimeout(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } else {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
-const Navbar = ({ onNavigate }) => {
   return (
     <nav className="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-lg">
       <div className="max-w-7xl mx-auto flex justify-between items-center px-4">
-        <div 
+        <div
           className="text-2xl font-bold cursor-pointer flex items-center space-x-2"
           onClick={() => onNavigate('landing')}
         >
@@ -11,21 +21,21 @@ const Navbar = ({ onNavigate }) => {
           <span>TruthLens</span>
         </div>
         <div className="hidden md:flex space-x-8">
-          <a 
-            href="#features" 
+          <button
+            onClick={() => handleSectionLink('features')}
             className="text-sm font-medium hover:text-blue-400 transition"
           >
             Product
-          </a>
-          <a 
-            href="#resources"
+          </button>
+          <button
+            onClick={() => handleSectionLink('resources')}
             className="text-sm font-medium hover:text-blue-400 transition"
           >
             Resources
-          </a>
+          </button>
         </div>
         <div>
-          <button 
+          <button
             onClick={() => onNavigate('verify')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold transition"
           >

@@ -9,7 +9,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar onNavigate={setCurrentPage} />
+      <Navbar onNavigate={setCurrentPage} currentPage={currentPage} />
       
       <main className="flex-grow">
         {currentPage === 'landing' && (

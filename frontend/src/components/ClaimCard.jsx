@@ -1,8 +1,10 @@
+import { useState } from 'react';
 
 const ClaimCard = ({ data }) => {
-  const { 
-    claim, status, risk_score, confidence, consensus_stats, 
-    explanation, reasoning, evidence_details 
+  const [showAllEvidence, setShowAllEvidence] = useState(false);
+  const {
+    claim, status, risk_score, confidence, consensus_stats,
+    explanation, reasoning, evidence_details
   } = data;
 
   const getStatusColor = () => {
@@ -82,16 +84,24 @@ const ClaimCard = ({ data }) => {
       {/* Multi-Source Evidence List */}
       <div className="space-y-3">
         <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Primary Evidence Sources</div>
-        {evidence_details?.slice(0, 3).map((ev, idx) => (
+        {(showAllEvidence ? evidence_details : evidence_details?.slice(0, 3))?.map((ev, idx) => (
           <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
             <div className="flex justify-between items-start mb-2">
               <div className="flex items-center">
                 <span className={`w-2 h-2 rounded-full mr-2 ${
                   ev.verdict === 'Supported' ? 'bg-green-500' : ev.verdict === 'Contradicted' ? 'bg-red-500' : 'bg-yellow-500'
                 }`}></span>
-                <span className="text-[11px] font-bold text-slate-500 uppercase truncate max-w-[150px]">
+                <span className="text-[11px] font-bold text-slate-500 uppercase truncate max-w-[120px]">
                   {ev.source}
                 </span>
+                {ev.relevance_score != null && (
+                  <span className={`ml-1 text-[9px] font-bold px-1 rounded ${
+                    ev.relevance_score >= 0.5 ? 'bg-blue-50 text-blue-500' :
+                    ev.relevance_score >= 0.3 ? 'bg-slate-100 text-slate-400' : 'bg-orange-50 text-orange-400'
+                  }`}>
+                    {(ev.relevance_score * 100).toFixed(0)}%
+                  </span>
+                )}
                 {ev.url && (
                   <a href={ev.url} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-400 hover:text-blue-600">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,6 +117,16 @@ const ClaimCard = ({ data }) => {
             <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed italic">"{ev.text}"</p>
           </div>
         ))}
+        {evidence_details?.length > 3 && (
+          <button
+            onClick={() => setShowAllEvidence(prev => !prev)}
+            className="w-full text-xs font-bold text-blue-500 hover:text-blue-700 py-2 border border-dashed border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            {showAllEvidence
+              ? 'Show fewer sources'
+              : `Show ${evidence_details.length - 3} more source${evidence_details.length - 3 > 1 ? 's' : ''}`}
+          </button>
+        )}
       </div>
       
       <div className="mt-6 flex gap-6 items-center border-t pt-5 border-slate-100">
