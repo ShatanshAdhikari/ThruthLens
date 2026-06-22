@@ -15,49 +15,56 @@ class VerificationService:
 
     def verify_against_sources(self, claim: str, sources: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Verify a claim against multiple sources and calculate consensus using a Judge Agent.
+        Verify a claim against multiple semantically-relevant sources.
+        Sources have already been filtered for relevance by RetrievalService.
         """
         if not sources:
             return {
-                "status": "Insufficient Evidence",
-                "risk_score": 0.0,
+                "status": "Inconclusive",
+                "risk_score": 0.5,
                 "confidence": 0.0,
                 "consensus_stats": {"Supported": 0, "Contradicted": 0, "Insufficient Evidence": 0},
                 "evidence_details": [],
-                "reasoning": "No evidence found on the web."
+                "reasoning": "No relevant evidence was found for this claim after filtering."
             }
-            
+
         evidence_details = []
         stats = {"Supported": 0, "Contradicted": 0, "Insufficient Evidence": 0}
-        
-        # 1. Individual NLI checks (Clinical Audit Trail)
+
+        # 1. Individual NLI check on each relevant source
         for source in sources:
             v_res = self.verify_claim(claim, source["text"])
-            source_name = source.get("source") or source.get("metadata", {}).get("source", "Unknown")
-            
+
+            # Prefer flat source/url fields (set by retrieval_service), fall back to metadata
+            source_name = (
+                source.get("source")
+                or source.get("metadata", {}).get("source", "Unknown")
+            )
+            url = source.get("url") or source.get("metadata", {}).get("url", "")
+            src_type = source.get("type") or source.get("metadata", {}).get("type", "web_search")
+
             detail = {
                 "text": source["text"],
                 "source": source_name,
-                "url": source.get("url") or source.get("metadata", {}).get("url"),
-                "type": source.get("type") or source.get("metadata", {}).get("type", "web_search"),
+                "url": url,
+                "type": src_type,
                 "verdict": v_res["status"],
-                "confidence": v_res["confidence"]
+                "confidence": v_res["confidence"],
+                "relevance_score": source.get("relevance_score"),
             }
             evidence_details.append(detail)
             stats[v_res["status"]] += 1
-            
-        # 2. Judge Agent Synthesis (Deep Reasoning)
+
+        # 2. Judge Agent — receives only pre-filtered, relevant evidence
         judge_res = ollama_service.judge_consensus(claim, evidence_details)
-        
-        # 3. Final Synthesis: Combine NLI stats with Judge Reasoning
-        # If Judge and NLI strongly disagree, we lean towards the Judge but flag uncertainty
+
         return {
             "status": judge_res.get("status", "Inconclusive"),
             "risk_score": float(judge_res.get("risk_score", 0.5)),
             "confidence": float(judge_res.get("confidence", 0.0)),
             "consensus_stats": stats,
             "evidence_details": evidence_details,
-            "reasoning": judge_res.get("reasoning", "The judge agent provided no reasoning.")
+            "reasoning": judge_res.get("reasoning", "The judge agent provided no reasoning."),
         }
 
     def verify_claim(self, claim: str, evidence: str, confidence_threshold: float = 0.5) -> Dict[str, Any]:

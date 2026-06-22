@@ -56,7 +56,76 @@ const LandingPage = ({ onStart }) => {
 
       {/* How it Works Section */}
       <div id="how-it-works" className="py-24 bg-white overflow-hidden">
-        {/* ... (existing content) */}
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl lg:text-center mb-16">
+            <h2 className="text-base font-semibold leading-7 text-blue-600 uppercase tracking-widest">How It Works</h2>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              The CAR Verification Pipeline
+            </p>
+            <p className="mt-4 text-gray-500">
+              Every submission passes through four rigorous stages to produce a transparent, auditable verdict.
+            </p>
+          </div>
+          <div className="relative">
+            {/* Connector line */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-100 hidden lg:block" aria-hidden="true" />
+            <div className="space-y-12 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-16 lg:gap-y-12">
+              {[
+                {
+                  step: '01',
+                  title: 'Deep Claim Deconstruction',
+                  description: 'An LLM (Llama3) breaks the input into atomic factual statements, resolving pronouns and maintaining context so every claim is self-contained and verifiable.',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                  ),
+                },
+                {
+                  step: '02',
+                  title: 'Multi-Perspective Search',
+                  description: 'Three targeted queries per claim harvest evidence from Tavily, Google Fact Check, and DuckDuckGo — supporting, contradicting, and contextual angles simultaneously.',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  ),
+                },
+                {
+                  step: '03',
+                  title: 'Consensus-Audit-Reasoning Engine',
+                  description: 'A DeBERTa NLI cross-encoder individually scores each source. A Judge Agent LLM then weighs source authority, resolves contradictions, and delivers a final verdict with full reasoning.',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  ),
+                },
+                {
+                  step: '04',
+                  title: 'Relational Audit Trail',
+                  description: 'Every claim, source URL, individual NLI verdict, and the Judge\'s reasoning chain are persisted to a database, giving you a complete, reproducible record of every verification.',
+                  icon: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                    </svg>
+                  ),
+                },
+              ].map((item) => (
+                <div key={item.step} className="relative flex gap-6 bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-blue-400 uppercase tracking-widest mb-1">Step {item.step}</div>
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">{item.title}</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed">{item.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Knowledge Base Section - Target for "Resources" */}

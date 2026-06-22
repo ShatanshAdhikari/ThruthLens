@@ -34,7 +34,13 @@ class ClaimExtractor:
         # 3. Map back to original text offsets
         processed_claims = []
         for item in llm_claims:
-            claim_text = item.get("claim", "")
+            # Handle both {"claim": "...", "reasoning": "..."} and plain strings
+            if isinstance(item, str):
+                claim_text = item.strip()
+            elif isinstance(item, dict):
+                claim_text = item.get("claim", "").strip()
+            else:
+                continue
             if not claim_text:
                 continue
                 

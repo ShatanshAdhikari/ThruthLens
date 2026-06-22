@@ -1,10 +1,10 @@
 from sentence_transformers import SentenceTransformer
+from app.config import settings
 import torch
 import numpy as np
-from functools import lru_cache
 
 class EmbeddingModel:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = settings.EMBEDDING_MODEL):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = SentenceTransformer(model_name, device=self.device)
         self._cache = {}

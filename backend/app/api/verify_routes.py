@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -9,6 +10,7 @@ from app.services.retrieval_service import retrieval_service
 from app.services.verification_service import verification_service
 from app.services.scoring_service import scoring_service
 from app.services.ollama_service import ollama_service
+from app.utils.logger import logger
 
 router = APIRouter()
 
@@ -35,9 +37,6 @@ class ClaimResult(BaseModel):
     consensus_stats: Dict[str, int]
     evidence_details: List[EvidenceDetail]
 
-import time
-from app.utils.logger import logger
-
 class VerifyResponse(BaseModel):
     job_id: int
     text: str
@@ -47,8 +46,11 @@ class VerifyResponse(BaseModel):
 
 @router.post("/verify", response_model=VerifyResponse)
 async def verify_text(request: VerifyRequest, db: Session = Depends(get_db)):
+    if not request.text or not request.text.strip():
+        return {"job_id": 0, "text": "", "claims": [], "overall_risk": 0.0, "metadata": None}
+
     start_time = time.time()
-    
+
     # Create a new verification job in the DB
     job = VerificationJob(text=request.text, status="Processing")
     db.add(job)

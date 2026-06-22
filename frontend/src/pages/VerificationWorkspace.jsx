@@ -19,7 +19,7 @@ const VerificationWorkspace = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post('http://localhost:8000/api/verify', { text });
+      const response = await axios.post('/api/verify', { text });
       setResults(response.data);
     } catch (err) {
       setError('Failed to verify text. Please ensure the backend is running.');
@@ -50,7 +50,13 @@ const VerificationWorkspace = () => {
               placeholder="Paste text here..."
               value={text}
               onChange={(e) => setText(e.target.value)}
+              maxLength={5000}
             />
+            <div className="flex justify-end mt-1">
+              <span className={`text-xs ${text.length > 4500 ? 'text-red-500' : 'text-gray-400'}`}>
+                {text.length} / 5000
+              </span>
+            </div>
             <button
               onClick={handleVerify}
               disabled={loading || !text.trim()}
