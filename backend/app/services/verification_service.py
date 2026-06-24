@@ -1,7 +1,13 @@
 from app.models.verifier_model import verifier_model
 from app.services.ollama_service import ollama_service
 from typing import Dict, Any, List
+import re
 import numpy as np
+
+# Words that signal a precise quantitative assertion the evidence must explicitly confirm
+_EXACT_QUANTIFIER = re.compile(r'\b(exactly|precisely|specifically)\b', re.IGNORECASE)
+# Pull every number (integer, decimal, percentage) from a string
+_NUMBERS = re.compile(r'\b\d+(?:[.,]\d+)?(?:\s*%)?')
 
 class VerificationService:
     def __init__(self):
@@ -58,10 +64,34 @@ class VerificationService:
         # 2. Judge Agent — receives only pre-filtered, relevant evidence
         judge_res = ollama_service.judge_consensus(claim, evidence_details)
 
+        status = judge_res.get("status", "Inconclusive")
+        confidence = float(judge_res.get("confidence", 0.0))
+
+        # Hard safety net: if the judge is not confident, don't force a definitive verdict
+        if confidence < 0.40 and status != "Inconclusive":
+            status = "Inconclusive"
+
+        # Mixed NLI signals with no clear majority → Inconclusive
+        total = sum(stats.values())
+        if total > 0 and status != "Inconclusive":
+            top_count = max(stats.values())
+            if top_count / total < 0.5:
+                status = "Inconclusive"
+
+        # Quantitative precision guard: if the claim uses "exactly/precisely N",
+        # the exact number must appear in at least one evidence snippet.
+        # If it doesn't, no source actually confirmed the specific value → Inconclusive.
+        if status == "Supported" and _EXACT_QUANTIFIER.search(claim):
+            claimed_nums = set(_NUMBERS.findall(claim))
+            all_evidence_text = " ".join(ev.get("text", "") for ev in evidence_details)
+            evidence_nums = set(_NUMBERS.findall(all_evidence_text))
+            if not claimed_nums.intersection(evidence_nums):
+                status = "Inconclusive"
+
         return {
-            "status": judge_res.get("status", "Inconclusive"),
+            "status": status,
             "risk_score": float(judge_res.get("risk_score", 0.5)),
-            "confidence": float(judge_res.get("confidence", 0.0)),
+            "confidence": confidence,
             "consensus_stats": stats,
             "evidence_details": evidence_details,
             "reasoning": judge_res.get("reasoning", "The judge agent provided no reasoning."),
