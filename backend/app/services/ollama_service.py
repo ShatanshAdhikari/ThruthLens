@@ -151,12 +151,15 @@ EVALUATION RULES:
 2. "By omission" contradiction: if authoritative sources describe what the subject IS known for, and the claimed attribute is completely absent, that IS a contradiction — not merely inconclusive.
 3. Weigh source authority: Wikipedia/official > established news > blogs.
 4. Do NOT use your own training knowledge to fill gaps in evidence. Reason only from what is shown.
-5. If the evidence strongly suggests the claim is false (even indirectly), choose "Contradicted".
+5. If the evidence directly and explicitly contradicts the claim, choose "Contradicted". Indirect suggestions are not enough.
+6. QUANTITATIVE PRECISION: If the claim asserts a specific number, percentage, or exact value (e.g. "exactly 30%", "exactly 7"), a source must state that precise value to "Support" it. General evidence supporting the direction (e.g. coffee helps productivity) does NOT confirm the specific figure — return "Inconclusive" in that case.
+7. CONFIDENCE FLOOR: If your confidence in the verdict is below 0.40, return "Inconclusive" — never force a definitive verdict on weak or mixed evidence.
+8. MIXED NLI SIGNALS: If the NLI vote has no clear majority (Supported and Contradicted counts are within 1 of each other) and evidence is ambiguous, default to "Inconclusive".
 
 VERDICT OPTIONS:
-- "Supported": Evidence directly confirms the claim. NLI majority says Supported.
-- "Contradicted": Evidence refutes the claim directly OR authoritative sources describe the subject in a way that is incompatible with the claim (by omission). NLI majority says Contradicted.
-- "Inconclusive": Evidence is genuinely off-topic, absent, or contradictory without resolution.
+- "Supported": Evidence directly and explicitly confirms the claim, including any specific quantities stated. NLI majority says Supported with confidence.
+- "Contradicted": Evidence directly refutes the claim OR authoritative sources are incompatible with it by omission. NLI majority says Contradicted with confidence.
+- "Inconclusive": Evidence is off-topic, absent, mixed, or insufficient to confirm/deny the specific claim as stated (including unverified precise quantities).
 
 Return ONLY valid JSON — no text outside it:
 {{

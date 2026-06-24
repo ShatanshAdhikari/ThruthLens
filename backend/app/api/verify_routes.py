@@ -1,5 +1,8 @@
+import asyncio
+import json
 import time
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -14,8 +17,10 @@ from app.utils.logger import logger
 
 router = APIRouter()
 
+
 class VerifyRequest(BaseModel):
     text: str
+
 
 class EvidenceDetail(BaseModel):
     text: str
@@ -24,6 +29,7 @@ class EvidenceDetail(BaseModel):
     type: str
     verdict: str
     confidence: float
+
 
 class ClaimResult(BaseModel):
     claim: str
@@ -37,12 +43,79 @@ class ClaimResult(BaseModel):
     consensus_stats: Dict[str, int]
     evidence_details: List[EvidenceDetail]
 
+
 class VerifyResponse(BaseModel):
     job_id: int
     text: str
     claims: List[ClaimResult]
     overall_risk: float
     metadata: Optional[dict] = None
+
+
+async def _process_single_claim(claim_data: dict, context: str) -> dict:
+    """Run retrieval + verification + explanation for one claim in the thread pool."""
+    claim_text = claim_data["text"]
+
+    candidates = await asyncio.to_thread(
+        retrieval_service.retrieve_hybrid, claim_text, context, 5
+    )
+    consensus = await asyncio.to_thread(
+        verification_service.verify_against_sources, claim_text, candidates
+    )
+    best_evidence = consensus["evidence_details"][0]["text"] if consensus["evidence_details"] else ""
+    explanation = await asyncio.to_thread(
+        ollama_service.generate_explanation, claim_text, best_evidence, consensus["status"]
+    )
+
+    return {
+        "claim": claim_text,
+        "status": consensus["status"],
+        "risk_score": consensus["risk_score"],
+        "confidence": consensus["confidence"],
+        "start": claim_data["start"],
+        "end": claim_data["end"],
+        "explanation": explanation,
+        "reasoning": consensus["reasoning"],
+        "consensus_stats": consensus["consensus_stats"],
+        "evidence_details": consensus["evidence_details"],
+    }
+
+
+def _persist_results(db: Session, text: str, results: list, overall_risk: float) -> int:
+    """Write a completed job + all claims + evidence to the DB and return job_id."""
+    job = VerificationJob(text=text, status="Completed", overall_risk=overall_risk)
+    db.add(job)
+    db.flush()
+
+    for res in results:
+        claim_obj = ExtractedClaim(
+            job_id=job.id,
+            claim_text=res["claim"],
+            status=res["status"],
+            risk_score=res["risk_score"],
+            confidence=res["confidence"],
+            consensus_stats=res["consensus_stats"],
+            reasoning=res["reasoning"],
+            start_char=res["start"],
+            end_char=res["end"],
+        )
+        db.add(claim_obj)
+        db.flush()
+
+        for ev in res["evidence_details"]:
+            db.add(EvidenceSource(
+                claim_id=claim_obj.id,
+                text=ev["text"],
+                source_name=ev["source"],
+                url=ev["url"],
+                source_type=ev["type"],
+                individual_verdict=ev["verdict"],
+                verdict_confidence=ev["confidence"],
+            ))
+
+    db.commit()
+    return job.id
+
 
 @router.post("/verify", response_model=VerifyResponse)
 async def verify_text(request: VerifyRequest, db: Session = Depends(get_db)):
@@ -51,112 +124,64 @@ async def verify_text(request: VerifyRequest, db: Session = Depends(get_db)):
 
     start_time = time.time()
 
-    # Create a new verification job in the DB
-    job = VerificationJob(text=request.text, status="Processing")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    
-    # 1. Extract Claims
     extract_start = time.time()
-    extracted_claims_data = claim_extractor.extract_claims(request.text)
-    extract_time = time.time() - extract_start
-    
-    results = []
-    retrieval_time = 0
-    verification_time = 0
-    explanation_time = 0
-    
-    for claim_data in extracted_claims_data:
-        claim_text = claim_data["text"]
-        
-        # 2. Retrieve Evidence (Hybrid: Local + Web)
-        # For clinical consensus, we want more results
-        r_start = time.time()
-        retrieval_candidates = retrieval_service.retrieve_hybrid(claim_text, context=request.text, n_results=5)
-        retrieval_time += (time.time() - r_start)
-        
-        # 3. Semantic Verification across candidates with Consensus
-        v_start = time.time()
-        consensus_res = verification_service.verify_against_sources(claim_text, retrieval_candidates)
-        verification_time += (time.time() - v_start)
-        
-        # 4. Generate Explanation (Async-style with Ollama)
-        e_start = time.time()
-        # Use the best evidence snippet for explanation
-        best_evidence = consensus_res["evidence_details"][0]["text"] if consensus_res["evidence_details"] else ""
-        explanation = ollama_service.generate_explanation(
-            claim_text, 
-            best_evidence, 
-            consensus_res["status"]
-        )
-        explanation_time += (time.time() - e_start)
-        
-        # Save claim to DB
-        claim_obj = ExtractedClaim(
-            job_id=job.id,
-            claim_text=claim_text,
-            status=consensus_res["status"],
-            risk_score=consensus_res["risk_score"],
-            confidence=consensus_res["confidence"],
-            consensus_stats=consensus_res["consensus_stats"],
-            reasoning=consensus_res["reasoning"],
-            start_char=claim_data["start"],
-            end_char=claim_data["end"]
-        )
-        db.add(claim_obj)
-        db.commit()
-        db.refresh(claim_obj)
-        
-        # Save evidence sources to DB
-        for ev in consensus_res["evidence_details"]:
-            ev_obj = EvidenceSource(
-                claim_id=claim_obj.id,
-                text=ev["text"],
-                source_name=ev["source"],
-                url=ev["url"],
-                source_type=ev["type"],
-                individual_verdict=ev["verdict"],
-                verdict_confidence=ev["confidence"]
-            )
-            db.add(ev_obj)
-        
-        db.commit()
-        
-        results.append({
-            "claim": claim_text,
-            "status": consensus_res["status"],
-            "risk_score": consensus_res["risk_score"],
-            "confidence": consensus_res["confidence"],
-            "start": claim_data["start"],
-            "end": claim_data["end"],
-            "explanation": explanation,
-            "reasoning": consensus_res["reasoning"],
-            "consensus_stats": consensus_res["consensus_stats"],
-            "evidence_details": consensus_res["evidence_details"]
-        })
-    
-    # 5. Final Scoring
+    extracted = await asyncio.to_thread(claim_extractor.extract_claims, request.text)
+    extract_ms = int((time.time() - extract_start) * 1000)
+
+    process_start = time.time()
+    results = list(await asyncio.gather(*[
+        _process_single_claim(cd, request.text) for cd in extracted
+    ]))
+    process_ms = int((time.time() - process_start) * 1000)
+
     summary = scoring_service.calculate_final_score(results)
-    
-    # Update job status
-    job.overall_risk = summary["overall_risk"]
-    job.status = "Completed"
-    db.commit()
-    
-    total_time = time.time() - start_time
-    
+    job_id = _persist_results(db, request.text, results, summary["overall_risk"])
+
     return {
-        "job_id": job.id,
+        "job_id": job_id,
         "text": request.text,
         "claims": results,
         "overall_risk": summary["overall_risk"],
         "metadata": {
-            "total_time_ms": int(total_time * 1000),
-            "extraction_time_ms": int(extract_time * 1000),
-            "retrieval_time_ms": int(retrieval_time * 1000),
-            "verification_time_ms": int(verification_time * 1000),
-            "explanation_time_ms": int(explanation_time * 1000),
-            "claim_count": len(results)
-        }
+            "total_time_ms": int((time.time() - start_time) * 1000),
+            "extraction_time_ms": extract_ms,
+            "processing_time_ms": process_ms,
+            "claim_count": len(results),
+        },
     }
+
+
+@router.post("/verify/stream")
+async def verify_text_stream(request: VerifyRequest, db: Session = Depends(get_db)):
+    """SSE endpoint — emits one JSON event per claim as it completes."""
+
+    async def event_stream():
+        if not request.text or not request.text.strip():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Empty input'})}\n\n"
+            return
+
+        try:
+            start_time = time.time()
+
+            extracted = await asyncio.to_thread(claim_extractor.extract_claims, request.text)
+            yield f"data: {json.dumps({'type': 'start', 'claim_count': len(extracted)})}\n\n"
+
+            results = []
+            for i, claim_data in enumerate(extracted):
+                claim_result = await _process_single_claim(claim_data, request.text)
+                results.append(claim_result)
+                yield f"data: {json.dumps({'type': 'claim', 'index': i, 'data': claim_result})}\n\n"
+
+            summary = scoring_service.calculate_final_score(results)
+            job_id = _persist_results(db, request.text, results, summary["overall_risk"])
+
+            yield f"data: {json.dumps({'type': 'complete', 'job_id': job_id, 'overall_risk': summary['overall_risk'], 'total_time_ms': int((time.time() - start_time) * 1000)})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

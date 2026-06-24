@@ -59,7 +59,7 @@ class ClaimExtractor:
             
             processed_claims.append({
                 "text": claim_text,
-                "reasoning": item.get("reasoning", ""),
+                "reasoning": item.get("reasoning", "") if isinstance(item, dict) else "",
                 "start": best_sent["start"],
                 "end": best_sent["end"]
             })

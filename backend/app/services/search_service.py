@@ -1,14 +1,16 @@
 import requests
+import time as _time
 from typing import List, Dict, Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from ddgs import DDGS
 from tavily import TavilyClient
 from app.config import settings
 from abc import ABC, abstractmethod
 
+_CACHE_TTL = 3600  # seconds
+
 
 def _domain_from_url(url: str) -> str:
-    """Return a human-readable domain name from a URL, e.g. 'en.wikipedia.org'."""
     try:
         netloc = urlparse(url).netloc
         return netloc.replace("www.", "") if netloc else url
@@ -63,6 +65,44 @@ class TavilySearchSource(BaseSearchSource):
             print(f"Tavily search error: {e}")
         return results
 
+class WikipediaSearchSource(BaseSearchSource):
+    _OPENSEARCH_URL = "https://en.wikipedia.org/w/api.php"
+    _SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{}"
+
+    def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+        results = []
+        try:
+            resp = requests.get(self._OPENSEARCH_URL, params={
+                "action": "opensearch",
+                "search": query,
+                "limit": min(max_results, 3),
+                "namespace": 0,
+                "format": "json",
+            }, timeout=6)
+            if resp.status_code != 200:
+                return results
+            _, titles, _, urls = resp.json()
+            for title, url in zip(titles, urls):
+                s_resp = requests.get(
+                    self._SUMMARY_URL.format(quote(title, safe="")),
+                    timeout=6
+                )
+                if s_resp.status_code == 200:
+                    data = s_resp.json()
+                    extract = data.get("extract", "").strip()
+                    if len(extract) >= 40:
+                        results.append({
+                            "text": extract[:600],
+                            "title": title,
+                            "source": "en.wikipedia.org",
+                            "url": url,
+                            "type": "encyclopedia",
+                        })
+        except Exception as e:
+            print(f"Wikipedia search error: {e}")
+        return results
+
+
 class GoogleFactCheckSource(BaseSearchSource):
     def __init__(self, api_key: Optional[str]):
         self.api_key = api_key
@@ -105,30 +145,40 @@ from app.services.ollama_service import ollama_service
 class SearchService:
     def __init__(self):
         self.sources: List[BaseSearchSource] = []
-        
+        self._cache: Dict[str, Any] = {}
+
         if settings.TAVILY_API_KEY:
             self.sources.append(TavilySearchSource(settings.TAVILY_API_KEY))
-            
+
         if settings.GOOGLE_FACT_CHECK_API_KEY:
             self.sources.append(GoogleFactCheckSource(settings.GOOGLE_FACT_CHECK_API_KEY))
-            
-        # Fallback to DDG
+
+        # Wikipedia — authoritative, free, no key required
+        self.sources.append(WikipediaSearchSource())
+
+        # DuckDuckGo as final fallback
         self.sources.append(DuckDuckGoSearchSource())
 
     def search_all(self, claim: str, context: Optional[str] = None, max_results: int = 5) -> List[Dict[str, Any]]:
         """
         Orchestrate multi-perspective search using LLM-generated queries.
+        Results are cached per claim text for one hour.
         """
-        # 1. Generate multi-perspective queries
+        cache_key = f"{claim}:{max_results}"
+        cached = self._cache.get(cache_key)
+        if cached:
+            result, ts = cached
+            if _time.time() - ts < _CACHE_TTL:
+                return result
+
         queries = ollama_service.generate_search_queries(claim, context)
-        
+
         all_results = []
-        seen_urls = set()
-        
-        # 2. Harvest results for each query
+        seen_urls: set = set()
+
         for query in queries:
             for source in self.sources:
-                source_results = source.search(query, max_results=2) # 2 per query/source
+                source_results = source.search(query, max_results=2)
                 for res in source_results:
                     url = res.get("url") or ""
                     if url and url in seen_urls:
@@ -136,10 +186,11 @@ class SearchService:
                     all_results.append(res)
                     if url:
                         seen_urls.add(url)
-                
+
                 if len(all_results) >= max_results * 2:
                     break
-                    
+
+        self._cache[cache_key] = (all_results, _time.time())
         return all_results
 
 # Singleton instance
